@@ -1,114 +1,51 @@
-export type LeadScore = 'hot' | 'warm' | 'cold'
+import 'dotenv/config'
+import { serve } from '@hono/node-server'
+import { Hono } from 'hono'
+import { cors } from 'hono/cors'
+import { logger } from 'hono/logger'
 
-export type DealStage =
-  | 'prospect'
-  | 'contacted'
-  | 'meeting_booked'
-  | 'closed_won'
-  | 'closed_lost'
+import { authMiddleware } from './middleware/auth'
+import { rateLimitMiddleware } from './middleware/rateLimit'
 
-// ── Database row types (match your Supabase schema exactly) ──
+import leadsRouter from './routes/leads'
+import dealsRouter from './routes/deals'
+import aiRouter from './routes/ai'
+import emailRouter from './routes/email'
 
-export interface Profile {
-  id: string
-  full_name: string | null
-  gmail_connected: boolean
-  created_at: string
-}
+const app = new Hono()
 
-export interface Lead {
-  id: string
-  user_id: string
-  name: string
-  company: string | null
-  role: string | null
-  email: string | null
-  linkedin_url: string | null
-  score: LeadScore | null
-  ai_summary: string | null
-  created_at: string
-}
+app.use('*', logger())
+const allowedOrigins = process.env.APP_URL
+  ? [process.env.APP_URL]
+  : ['http://localhost:3000', 'http://localhost:3001']
 
-export interface Deal {
-  id: string
-  user_id: string
-  lead_id: string
-  stage: DealStage
-  value: number | null
-  next_action: string | null
-  updated_at: string
-}
+app.use('*', cors({
+  origin: allowedOrigins,
+  allowHeaders: ['Authorization', 'Content-Type'],
+  allowMethods: ['GET', 'POST', 'PATCH', 'DELETE'],
+}))
 
-export interface EmailThread {
-  id: string
-  user_id: string
-  lead_id: string
-  gmail_thread_id: string
-  subject: string | null
-  last_message_at: string | null
-}
+app.get('/health', (c) => c.json({ status: 'ok', ts: new Date().toISOString() }))
 
-export interface GmailToken {
-  user_id: string
-  access_token: string
-  refresh_token: string
-  expires_at: string
-}
+app.use('/auth/*', authMiddleware)
+app.route('/auth/gmail', emailRouter)
 
-// ── Request body types (what your API routes expect) ──
+app.use('/api/*', authMiddleware)
+app.use('/api/*', rateLimitMiddleware)
 
-export interface CreateLeadBody {
-  name: string
-  company?: string
-  role?: string
-  email?: string
-  linkedin_url?: string
-}
+app.route('/api/leads', leadsRouter)
+app.route('/api/deals', dealsRouter)
+app.route('/api/ai', aiRouter)
+app.route('/api/email', emailRouter)
 
-export interface UpdateLeadBody {
-  name?: string
-  company?: string
-  role?: string
-  email?: string
-  linkedin_url?: string
-  score?: LeadScore
-}
+app.notFound((c) => c.json({ data: null, error: 'Route not found' }, 404))
 
-export interface CreateDealBody {
-  lead_id: string
-  stage?: DealStage
-  value?: number
-}
+app.onError((err, c) => {
+  console.error('Unhandled error:', err)
+  return c.json({ data: null, error: 'Internal server error' }, 500)
+})
 
-export interface UpdateDealBody {
-  stage?: DealStage
-  value?: number
-  next_action?: string
-}
+const port = Number(process.env.PORT ?? 8080)
+console.log(`🚀 Server running on http://localhost:${port}`)
 
-export interface EnrichLeadBody {
-  lead_id: string
-}
-
-export interface DraftEmailBody {
-  lead_id: string
-  intent: 'cold_intro' | 'follow_up' | 'breakup'
-}
-
-export interface NextActionBody {
-  deal_id: string
-}
-
-// ── API response wrapper ──
-
-export interface ApiSuccess<T> {
-  data: T
-  error: null
-}
-
-export interface ApiError {
-  data: null
-  error: string
-}
-
-export type ApiResponse<T> = ApiSuccess<T> | ApiError
+serve({ fetch: app.fetch, port })

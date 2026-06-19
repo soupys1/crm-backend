@@ -1,5 +1,5 @@
-import { buildDraftPrompt, EnrichmentResult, LeadInput } from './index'
-import { generateJSON } from './index'
+import { buildDraftPrompt, EnrichmentResult, LeadInput } from './prompts'
+import { generateJSON } from './client'
 
 export type DraftResult = {
   subject: string
@@ -19,10 +19,7 @@ export async function draftEmail(
     const cleaned = raw.replace(/```json\n?|```\n?/g, '').trim()
     const parsed = JSON.parse(cleaned)
 
-    if (
-      typeof parsed.subject !== 'string' ||
-      typeof parsed.body !== 'string'
-    ) {
+    if (typeof parsed.subject !== 'string' || typeof parsed.body !== 'string') {
       throw new Error('Draft response missing or invalid fields')
     }
 

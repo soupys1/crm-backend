@@ -1,4 +1,4 @@
-import { buildEnrichmentPrompt, EnrichmentResult, LeadInput } from './index'
+import { buildEnrichmentPrompt, EnrichmentResult, LeadInput } from './prompts'
 import { generateJSON } from './client'
 
 export async function enrichLead(lead: LeadInput): Promise<EnrichmentResult> {

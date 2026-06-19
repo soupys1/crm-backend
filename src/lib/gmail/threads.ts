@@ -1,9 +1,3 @@
-import { getValidAccessToken } from "./oauth";
-import { google } from 'googleapis'
-
-
-
-// Fetch email threads for a lead
 import { getValidAccessToken } from './oauth'
 import { google } from 'googleapis'
 
@@ -89,11 +83,3 @@ export async function sendEmail(
     }
   })
 }
-
-// Send an email
-export async function sendEmail(
-  userId: string,
-  to: string,
-  subject: string,
-  body: string
-): Promise<void>
