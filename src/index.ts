@@ -27,7 +27,6 @@ app.use('*', cors({
 
 app.get('/health', (c) => c.json({ status: 'ok', ts: new Date().toISOString() }))
 
-app.use('/auth/*', authMiddleware)
 app.route('/auth/gmail', emailRouter)
 
 app.use('/api/*', authMiddleware)

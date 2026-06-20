@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { fetchThreads, sendEmail } from '../lib/gmail/threads'
 import { getAuthUrl, exchangeCodeForTokens, saveTokens } from '../lib/gmail/oauth'
+import { createUserClient } from '../lib/supabase'
 import type { AppVariables } from '../types'
 
 const email = new Hono<{ Variables: AppVariables }>()
@@ -12,7 +13,7 @@ const sendSchema = z.object({
   body: z.string().min(1),
 })
 
-// GET /email/threads?lead_email=...
+// GET /api/email/threads?lead_email=...
 email.get('/threads', async (c) => {
   const userId = c.get('userId')
   const leadEmail = c.req.query('lead_email')
@@ -27,7 +28,7 @@ email.get('/threads', async (c) => {
   }
 })
 
-// POST /email/send
+// POST /api/email/send
 email.post('/send', async (c) => {
   const userId = c.get('userId')
   const body = await c.req.json()
@@ -40,29 +41,41 @@ email.post('/send', async (c) => {
     return c.json({ data: { sent: true }, error: null })
   } catch (err: any) {
     if (err.message?.includes('No Gmail tokens')) {
-      return c.json({ data: null, error: 'Gmail not connected. Visit /auth/gmail/connect first.' }, 403)
+      return c.json({ data: null, error: 'Gmail not connected. Visit /settings to connect first.' }, 403)
     }
     return c.json({ data: null, error: err.message ?? 'Failed to send email' }, 500)
   }
 })
 
-// GET /auth/gmail/connect — redirect to Google consent screen
+// GET /auth/gmail/connect?token=<supabase_jwt>
+// Unprotected — token passed as query param, forwarded as OAuth state
 email.get('/connect', async (c) => {
-  const authUrl = getAuthUrl()
+  const token = c.req.query('token')
+  if (!token) return c.json({ data: null, error: 'Missing token query param' }, 400)
+
+  const authUrl = getAuthUrl(token)
   return c.redirect(authUrl)
 })
 
-// GET /auth/gmail/callback — Google posts back here with the authorization code
+// GET /auth/gmail/callback — Google redirects here with code + state (our JWT)
 email.get('/callback', async (c) => {
-  const userId = c.get('userId')
   const code = c.req.query('code')
+  const state = c.req.query('state') // this is the user's Supabase JWT
 
-  if (!code) return c.json({ data: null, error: 'Missing code from Google' }, 400)
+  if (!code || !state) return c.json({ data: null, error: 'Missing code or state from Google' }, 400)
+
+  // Verify the JWT to get the userId
+  const userClient = createUserClient(state)
+  const { data: { user }, error: authError } = await userClient.auth.getUser()
+
+  if (authError || !user) {
+    return c.json({ data: null, error: 'Invalid or expired session token in state' }, 401)
+  }
 
   try {
     const tokens = await exchangeCodeForTokens(code)
-    await saveTokens(userId, tokens)
-    return c.redirect(`${process.env.APP_URL ?? 'http://localhost:3000'}/settings?gmail=connected`)
+    await saveTokens(user.id, tokens)
+    return c.redirect(`${process.env.APP_URL ?? 'http://localhost:3001'}/settings?gmail=connected`)
   } catch (err: any) {
     return c.json({ data: null, error: err.message ?? 'OAuth exchange failed' }, 500)
   }
