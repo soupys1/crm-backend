@@ -6,7 +6,7 @@ REST API for the AI-powered CRM. Built with [Hono](https://hono.dev/) and TypeSc
 
 - **Framework** — Hono (TypeScript)
 - **Database / Auth** — Supabase (Postgres + JWT verification)
-- **AI** — Google Gemini (lead enrichment, email drafting)
+- **AI** — Groq / Llama 3.3 70B (lead enrichment, email drafting)
 - **Email** — Gmail API via OAuth 2.0
 
 ## Getting Started
@@ -32,10 +32,10 @@ PORT=3000
 APP_URL=http://localhost:3001
 
 SUPABASE_URL=your_supabase_url
+SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-SUPABASE_JWT_SECRET=your_jwt_secret
 
-GEMINI_API_KEY=your_gemini_api_key
+GROQ_API_KEY=your_groq_api_key
 
 GOOGLE_CLIENT_ID=your_google_client_id
 GOOGLE_CLIENT_SECRET=your_google_client_secret
